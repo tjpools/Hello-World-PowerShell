@@ -1,0 +1,12 @@
+*.exe
+*.obj
+*.ilk
+*.pdb
+
+*.objdump.txt
+*.hexdump.txt
+
+ghidra-test.gpr
+ghidra-test.lock
+ghidra-test.lock~
+ghidra-test.rep/
