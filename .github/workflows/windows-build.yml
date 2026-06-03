@@ -1,0 +1,38 @@
+name: Windows Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build release target
+        shell: pwsh
+        run: .\build.ps1 -Target release -Clean
+
+      - name: Build debug target
+        shell: pwsh
+        run: .\build.ps1 -Target debug
+
+      - name: Generate analysis dumps
+        shell: pwsh
+        run: .\build.ps1 -Target dumps -Clean
+
+      - name: Upload generated dumps
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-analysis-dumps
+          path: |
+            test.objdump.txt
+            test.main.objdump.txt
+            test.invoke_main.objdump.txt
+            test.mainCRTStartup.objdump.txt
+            test.hexdump.txt

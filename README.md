@@ -7,6 +7,8 @@ This project contains a simple C++ program that prints `Hello World!` to the con
 | File or Path | Type | Role |
 | --- | --- | --- |
 | `.gitignore` | tracked project file | Excludes generated binaries, dump outputs, and Ghidra local project files from version control. |
+| `.github/workflows/windows-build.yml` | tracked project file | GitHub Actions workflow that validates the PowerShell build on Windows and uploads generated dump artifacts. |
+| `LICENSE` | tracked project file | MIT license for the project repository. |
 | `Makefile` | tracked project file | Defines the `nmake` build, run, clean, and dump-generation workflows. |
 | `README.md` | tracked project file | Documents the project structure and common commands. |
 | `test.cpp` | tracked project file | Contains the C++ source code for the `Hello World!` program. |
@@ -31,8 +33,25 @@ These files define the project and are the ones you would normally keep in versi
 
 - `test.cpp` - the program source; defines `main()` and prints `Hello World!`
 - `Makefile` - the Windows `nmake` build script; builds release and debug binaries, runs the program, and generates analysis dumps
+- `.github/workflows/windows-build.yml` - GitHub Actions CI that runs the Windows command-line build and produces dump artifacts
+- `LICENSE` - MIT license for the repository
 - `.gitignore` - prevents generated artifacts from cluttering the repository
 - `README.md` - project documentation and command reference
+
+## License
+
+This project is licensed under the MIT License. See `LICENSE` for the full text.
+
+## Continuous Integration
+
+GitHub Actions runs the Windows build workflow from `.github/workflows/windows-build.yml` on pushes to `main` and on pull requests.
+
+The workflow:
+
+- builds the release target
+- builds the debug target
+- regenerates the disassembly and hexdump outputs using `build.ps1`
+- uploads the generated dump files as workflow artifacts
 
 ## Generated Files
 
