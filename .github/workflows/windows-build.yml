@@ -14,25 +14,25 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Build release target
+      - name: Build release artifact
         shell: pwsh
-        run: .\build.ps1 -Target release -Clean
+        run: .\scripts\build.ps1 -Target release -Clean
 
-      - name: Build debug target
+      - name: Run analysis pipeline
         shell: pwsh
-        run: .\build.ps1 -Target debug
+        run: .\scripts\build.ps1 -Target dumps -Clean
 
-      - name: Generate analysis dumps
-        shell: pwsh
-        run: .\build.ps1 -Target dumps -Clean
-
-      - name: Upload generated dumps
+      - name: Upload build and analysis artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: windows-analysis-dumps
+          name: windows-artifacts
+          if-no-files-found: warn
           path: |
-            test.objdump.txt
-            test.main.objdump.txt
-            test.invoke_main.objdump.txt
-            test.mainCRTStartup.objdump.txt
-            test.hexdump.txt
+            build/test.exe
+            build/test.obj
+            build/test.pdb
+            build/test.ilk
+            analysis/objdump/*.txt
+            analysis/hexdump/*.txt
+            analysis/ghidra/ghidra-test.gpr
+            analysis/ghidra/ghidra-test.rep/**

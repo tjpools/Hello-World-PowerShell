@@ -1,10 +1,5 @@
-*.exe
-*.obj
-*.ilk
-*.pdb
-
-*.objdump.txt
-*.hexdump.txt
+build/
+analysis/
 
 ghidra-test.gpr
 ghidra-test.lock
