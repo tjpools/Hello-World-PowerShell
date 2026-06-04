@@ -1,3 +1,15 @@
+<#
+Canonical repository layout:
+
+/
+|- src/        authored C++ source
+|- build/      compiler and linker outputs
+|- analysis/   objdump, hexdump, and Ghidra outputs
+|- scripts/    pipeline entrypoints
+
+This script owns the transition from source to build artifacts to analysis artifacts.
+#>
+
 param(
     [ValidateSet('clean', 'release', 'debug', 'run', 'debug-run', 'dumps')]
     [string]$Target = 'dumps',

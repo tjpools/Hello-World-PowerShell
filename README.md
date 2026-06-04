@@ -30,31 +30,38 @@ This repository is structured as a teaching artifact and a reference implementat
 /
 ├── .github/
 │   └── workflows/
-│       └── windows-build.yml
-├── analysis/
+│       └── windows-build.yml        # GitHub Actions CI for the Windows MSVC pipeline
+│
+├── analysis/                        # Reverse-engineering and inspection outputs
 │   ├── ghidra/
-│   │   ├── ghidra-test.gpr
-│   │   └── ghidra-test.rep/
+│   │   ├── ghidra-test.gpr          # Ghidra project file
+│   │   └── ghidra-test.rep/         # Ghidra internal representation directory
+│   │
 │   ├── hexdump/
-│   │   └── test.hexdump.txt
+│   │   └── test.hexdump.txt         # Raw hex dump of the compiled binary
+│   │
 │   └── objdump/
-│       ├── test.objdump.txt
-│       ├── test.main.objdump.txt
+│       ├── test.objdump.txt         # Full PE/COFF disassembly output
+│       ├── test.main.objdump.txt    # Disassembly of main()
 │       ├── test.invoke_main.objdump.txt
 │       └── test.mainCRTStartup.objdump.txt
-├── build/
+│
+├── build/                           # Compiler and linker artifacts
 │   ├── test.exe
 │   ├── test.obj
 │   ├── test.pdb
 │   ├── test.ilk
 │   └── vc140.pdb
+│
 ├── scripts/
-│   └── build.ps1
+│   └── build.ps1                    # Full build and analysis pipeline (MSVC)
+│
 ├── src/
-│   └── test.cpp
+│   └── test.cpp                     # Minimal C++ source probe
+│
 ├── .gitignore
 ├── LICENSE
-├── Makefile
+├── Makefile                         # Convenience entrypoint for the PowerShell pipeline
 └── README.md
 ```
 
@@ -67,6 +74,39 @@ This repository is structured as a teaching artifact and a reference implementat
 - `analysis/hexdump/` contains the byte-level dump.
 - `analysis/ghidra/` contains the local Ghidra project created from the built binary.
 - `Makefile` is a thin command-line entrypoint that delegates to the PowerShell pipeline.
+
+## Why This Layout Is Correct
+
+### 1. It separates the three conceptual layers cleanly
+
+- `src/` is the mathematical description.
+- `build/` is the compiled artifact.
+- `analysis/` is the semantic reconstruction.
+
+That separation keeps authorship, execution, and interpretation distinct.
+
+### 2. It makes the repository reproducible
+
+Anyone can:
+
+- build the binary
+- inspect the binary
+- reproduce the analysis
+
+from one documented pipeline with stable output locations.
+
+### 3. It communicates professionalism
+
+The layout signals that this repository is not just a trivial executable. It is a complete toolchain artifact with explicit automation, generated outputs, and analysis products.
+
+### 4. It scales
+
+The structure leaves room for:
+
+- additional source files in `src/`
+- additional binaries in `build/`
+- additional analysis stages under `analysis/`
+- future tooling integrations without collapsing the root directory
 
 ## Build Instructions
 
