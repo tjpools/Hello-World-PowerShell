@@ -2,27 +2,34 @@
 
 ## Project Overview
 
-This repository is a complete C++ to binary to analysis pipeline for a deliberately simple `Hello World!` program.
+This repository is a complete, reproducible C++ to binary to analysis pipeline for a deliberately small `Hello World!` program.
 
-The source code is small. The artifact is not. The point of the repository is to show the full path from:
+The program is minimal. The artifact is not.
 
-- source code in `src/`
-- compiled outputs in `build/`
-- inspection outputs in `analysis/`
+The repository exists to make the entire path legible:
+
+- authored source in `src/`
+- compiler and linker outputs in `build/`
+- reverse-engineering outputs in `analysis/`
 - automation in `scripts/` and `.github/workflows/`
 
-## Why This Repo Exists
+## Philosophy Of The Artifact
 
 The tool is not the executable.
 The tool is the entire directory.
 
-This repository is structured as a teaching artifact and a reference implementation for a repeatable Windows-native reverse-engineering workflow:
+This repository treats a binary not as an endpoint, but as one stage in a larger artifact pipeline:
 
-- write or change C++ in `src/`
-- build with MSVC from PowerShell
-- capture the produced binary and debug metadata in `build/`
-- derive objdump, hexdump, and Ghidra project outputs in `analysis/`
-- reproduce the full pipeline with one command
+- source code describes intent
+- build outputs capture execution reality
+- analysis outputs reconstruct semantics from the produced binary
+
+That is why the repository keeps these layers separate. The point is not just to compile `test.cpp`. The point is to preserve a complete, inspectable chain from notation to execution to interpretation.
+
+As a result, the repository is both:
+
+- a teaching artifact for reverse-engineering workflow design
+- a reference implementation for reproducible Windows-native binary analysis
 
 ## Directory Layout
 
@@ -108,11 +115,20 @@ The structure leaves room for:
 - additional analysis stages under `analysis/`
 - future tooling integrations without collapsing the root directory
 
+## Tooling Model
+
+This project is operated from PowerShell and command-line tools, not from the Visual Studio IDE.
+
+- PowerShell is the orchestration shell.
+- Visual Studio provides the MSVC toolchain: `cl`, `link`, `dumpbin`, and the developer environment.
+- `scripts/build.ps1` is the authoritative pipeline.
+- GitHub Actions reproduces the same pipeline on a Windows runner.
+
 ## Build Instructions
 
 ### PowerShell (MSVC)
 
-This is the primary workflow for the repository.
+This is the primary workflow for the repository and the canonical way to reproduce the artifact.
 
 Requirements:
 
@@ -139,6 +155,19 @@ What the script does:
 - compiles with MSVC using `/EHsc /Zi /nologo`
 - emits compiled artifacts into `build/`
 - emits objdump, hexdump, and Ghidra outputs into `analysis/`
+
+### Production Build Script
+
+The PowerShell pipeline is intentionally written as a real tool rather than a wrapper around ad hoc commands.
+
+It provides:
+
+- automatic MSVC detection
+- reproducible directory creation
+- explicit target selection
+- deterministic output locations
+- artifact validation after each major stage
+- optional Ghidra project refresh when Ghidra is installed locally
 
 ### Makefile
 
@@ -228,7 +257,12 @@ The workflow:
 
 - builds the release artifact on a Windows runner
 - runs the analysis pipeline through `scripts/build.ps1`
+- verifies that the expected outputs were actually produced
 - uploads build and analysis outputs as workflow artifacts
+
+CI treats Ghidra as optional. The workflow runs the analysis pipeline with `-SkipGhidra` so a clean Windows runner does not need a local Ghidra installation. Local runs still import into Ghidra automatically when `analyzeHeadless.bat` is available.
+
+This keeps the repository aligned with its core promise: the full artifact can be rebuilt and inspected in a fresh environment.
 
 ## License
 

@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Check out repository
@@ -20,19 +22,60 @@ jobs:
 
       - name: Run analysis pipeline
         shell: pwsh
-        run: .\scripts\build.ps1 -Target dumps -Clean
+        run: .\scripts\build.ps1 -Target dumps -Clean -SkipGhidra
+
+      - name: Verify expected outputs
+        shell: pwsh
+        run: |
+          $paths = @(
+            'build/test.exe',
+            'build/test.obj',
+            'build/test.pdb',
+            'analysis/objdump/test.objdump.txt',
+            'analysis/objdump/test.main.objdump.txt',
+            'analysis/objdump/test.invoke_main.objdump.txt',
+            'analysis/objdump/test.mainCRTStartup.objdump.txt',
+            'analysis/hexdump/test.hexdump.txt'
+          )
+          foreach ($path in $paths) {
+            if (-not (Test-Path $path)) {
+              throw "Missing expected artifact: $path"
+            }
+          }
 
       - name: Upload build and analysis artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows-artifacts
+          retention-days: 14
           if-no-files-found: warn
           path: |
             build/test.exe
             build/test.obj
             build/test.pdb
             build/test.ilk
+            build/vc140.pdb
             analysis/objdump/*.txt
             analysis/hexdump/*.txt
+
+      - name: Check for local Ghidra artifacts
+        id: ghidra
+        shell: pwsh
+        run: |
+          if (Test-Path 'analysis/ghidra/ghidra-test.gpr') {
+            "present=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          }
+          else {
+            "present=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          }
+
+      - name: Upload Ghidra artifacts
+        if: steps.ghidra.outputs.present == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ghidra-artifacts
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
             analysis/ghidra/ghidra-test.gpr
             analysis/ghidra/ghidra-test.rep/**

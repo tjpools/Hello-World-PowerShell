@@ -1,13 +1,23 @@
 <#
-Canonical repository layout:
+.SYNOPSIS
+Builds and analyzes the Hello World PowerShell artifact.
 
-/
-|- src/        authored C++ source
-|- build/      compiler and linker outputs
-|- analysis/   objdump, hexdump, and Ghidra outputs
-|- scripts/    pipeline entrypoints
+.DESCRIPTION
+This script is the authoritative pipeline for the repository. It compiles the C++ source with
+MSVC, writes build outputs into build/, derives analysis outputs into analysis/, and optionally
+refreshes a local Ghidra project.
 
-This script owns the transition from source to build artifacts to analysis artifacts.
+.PARAMETER Target
+Pipeline target to execute.
+
+.PARAMETER Clean
+Removes reproducible outputs before executing the requested target.
+
+.PARAMETER Arch
+Architecture passed to VsDevCmd.bat.
+
+.PARAMETER SkipGhidra
+Skips Ghidra project generation. Useful for CI environments where Ghidra is not installed.
 #>
 
 param(
@@ -17,10 +27,14 @@ param(
     [switch]$Clean,
 
     [ValidateSet('x64', 'x86')]
-    [string]$Arch = 'x64'
+    [string]$Arch = 'x64',
+
+    [switch]$SkipGhidra
 )
 
+Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $srcDir = Join-Path $repoRoot 'src'
@@ -42,6 +56,47 @@ $mainObjdump = Join-Path $objdumpDir 'test.main.objdump.txt'
 $invokeMainObjdump = Join-Path $objdumpDir 'test.invoke_main.objdump.txt'
 $mainCrtObjdump = Join-Path $objdumpDir 'test.mainCRTStartup.objdump.txt'
 $hexdump = Join-Path $hexdumpDir 'test.hexdump.txt'
+$ghidraProjectName = 'ghidra-test'
+$ghidraProjectFile = Join-Path $ghidraDir "$ghidraProjectName.gpr"
+
+function Write-Step {
+    param([string]$Message)
+
+    Write-Host "==> $Message"
+}
+
+function Test-CommandAvailable {
+    param([string]$Name)
+
+    return $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
+}
+
+function Assert-PathExists {
+    param(
+        [string]$Path,
+        [string]$Message
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        throw $Message
+    }
+}
+
+function Invoke-NativeCommand {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath,
+
+        [string[]]$Arguments = @(),
+
+        [string]$FailureMessage = 'Native command failed.'
+    )
+
+    & $FilePath @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "$FailureMessage Exit code: $LASTEXITCODE"
+    }
+}
 
 function Ensure-Directory {
     param([string]$Path)
@@ -73,6 +128,8 @@ function Initialize-Directories {
 }
 
 function Invoke-CleanLayout {
+    Write-Step 'Cleaning generated layout'
+
     Remove-PathIfExists -Path $buildDir
     Remove-PathIfExists -Path $analysisDir
 
@@ -114,7 +171,7 @@ function Import-VsDevEnvironment {
         throw "VsDevCmd.bat was not found at $vsDevCmd"
     }
 
-    Write-Host "Using Visual Studio tools from: $vsPath"
+    Write-Step "Using Visual Studio tools from: $vsPath"
 
     $environmentLines = & cmd /c "`"$vsDevCmd`" -arch=$Arch >nul && set"
     foreach ($line in $environmentLines) {
@@ -133,6 +190,7 @@ function Invoke-ClBuild {
     param([ValidateSet('release', 'debug')] [string]$Configuration)
 
     Initialize-Directories
+    Assert-PathExists -Path $sourceFile -Message "Source file not found: $sourceFile"
 
     $compileFlags = @('/EHsc', '/nologo', '/Zi')
     if ($Configuration -eq 'release') {
@@ -144,6 +202,8 @@ function Invoke-ClBuild {
 
     Push-Location $buildDir
     try {
+        Write-Step "Building $Configuration artifacts"
+
         $arguments = @(
             $sourceFile,
             '/Fotest.obj',
@@ -157,10 +217,11 @@ function Invoke-ClBuild {
             '/ILK:test.ilk'
         )
 
-        & cl @arguments
-        if ($LASTEXITCODE -ne 0) {
-            throw "cl failed with exit code $LASTEXITCODE"
-        }
+        Invoke-NativeCommand -FilePath 'cl' -Arguments $arguments -FailureMessage 'MSVC compilation failed.'
+
+        Assert-PathExists -Path $targetExe -Message "Expected executable was not produced: $targetExe"
+        Assert-PathExists -Path $targetObj -Message "Expected object file was not produced: $targetObj"
+        Assert-PathExists -Path $targetPdb -Message "Expected PDB file was not produced: $targetPdb"
     }
     finally {
         Pop-Location
@@ -214,21 +275,35 @@ function Find-GhidraHeadless {
 function Import-GhidraProject {
     Initialize-Directories
 
+    if ($SkipGhidra) {
+        Write-Step 'Skipping Ghidra project generation'
+        return
+    }
+
     $headless = Find-GhidraHeadless
     if (-not $headless) {
         Write-Warning 'Ghidra analyzeHeadless.bat was not found. Skipping Ghidra project generation.'
         return
     }
 
-    $projectName = 'ghidra-test'
-    & $headless $ghidraDir $projectName -import $targetExe -overwrite
-    if ($LASTEXITCODE -ne 0) {
-        throw "Ghidra import failed with exit code $LASTEXITCODE"
-    }
+    Write-Step 'Refreshing Ghidra project'
+
+    Invoke-NativeCommand -FilePath $headless -Arguments @($ghidraDir, $ghidraProjectName, '-import', $targetExe, '-overwrite') -FailureMessage 'Ghidra headless import failed.'
+    Assert-PathExists -Path $ghidraProjectFile -Message "Expected Ghidra project file was not produced: $ghidraProjectFile"
 }
 
 function Invoke-AnalysisPipeline {
     Initialize-Directories
+
+    if (-not (Test-CommandAvailable -Name 'dumpbin')) {
+        throw 'dumpbin is not available on PATH. Ensure the Visual Studio developer environment is loaded.'
+    }
+
+    if (-not (Test-CommandAvailable -Name 'Format-Hex')) {
+        throw 'Format-Hex is not available in the current PowerShell session.'
+    }
+
+    Write-Step 'Generating disassembly and inspection outputs'
 
     & dumpbin /DISASM /RAWDATA:NONE $targetExe | Out-File -FilePath $fullObjdump -Encoding ascii
     if ($LASTEXITCODE -ne 0) {
@@ -240,6 +315,13 @@ function Invoke-AnalysisPipeline {
     Write-FunctionSlice -InputPath $fullObjdump -Label 'mainCRTStartup' -OutputPath $mainCrtObjdump
 
     Format-Hex -Path $targetExe | Out-File -FilePath $hexdump -Encoding ascii
+
+    Assert-PathExists -Path $fullObjdump -Message "Expected objdump output was not produced: $fullObjdump"
+    Assert-PathExists -Path $mainObjdump -Message "Expected main slice was not produced: $mainObjdump"
+    Assert-PathExists -Path $invokeMainObjdump -Message "Expected invoke_main slice was not produced: $invokeMainObjdump"
+    Assert-PathExists -Path $mainCrtObjdump -Message "Expected mainCRTStartup slice was not produced: $mainCrtObjdump"
+    Assert-PathExists -Path $hexdump -Message "Expected hexdump was not produced: $hexdump"
+
     Import-GhidraProject
 }
 
@@ -248,18 +330,16 @@ function Invoke-Binary {
         throw "Built executable not found at $targetExe"
     }
 
-    & $targetExe
-    if ($LASTEXITCODE -ne 0) {
-        throw "Executable returned exit code $LASTEXITCODE"
-    }
+    Write-Step 'Running built executable'
+    Invoke-NativeCommand -FilePath $targetExe -FailureMessage 'Built executable returned a failure exit code.'
 }
 
 if ($Clean) {
-    Write-Host 'Running clean first: yes'
+    Write-Step 'Running clean first'
     Invoke-CleanLayout
 }
 
-Write-Host "Running target: $Target"
+Write-Step "Running target: $Target"
 
 if ($Target -eq 'clean') {
     Invoke-CleanLayout
