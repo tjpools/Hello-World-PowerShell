@@ -15,21 +15,21 @@ The repository exists to make the entire path legible:
 
 ## Philosophy Of The Artifact
 
-The tool is not the executable.
-The tool is the entire directory.
+The code is trivial; the structure is the artifact.
 
-This repository treats a binary not as an endpoint, but as one stage in a larger artifact pipeline:
+This repository should be read as a structural artifact, not as an application sample. The C++ program is intentionally minimal. Its role is to act as the seed around which the real object forms: source, build outputs, disassembly, hex views, Ghidra project state, and automation preserved as one inspectable unit.
 
-- source code describes intent
-- build outputs capture execution reality
-- analysis outputs reconstruct semantics from the produced binary
+In that sense, the directory structure is the shell, and the executable is only one expression of it.
 
-That is why the repository keeps these layers separate. The point is not just to compile `test.cpp`. The point is to preserve a complete, inspectable chain from notation to execution to interpretation.
+The intellectual payload is not in `src/test.cpp`. The payload is the artifact pipeline:
 
-As a result, the repository is both:
+- authored intent
+- compiled binary
+- reverse-engineered reconstruction
 
-- a teaching artifact for reverse-engineering workflow design
-- a reference implementation for reproducible Windows-native binary analysis
+The value lies in the preserved relations between these layers. The code is deliberately underpowered so that the repository's morphology becomes visible. What matters is the scaffold: the directory topology, the reproducible generation of intermediates, and the way analysis outputs are kept co-resident with the source that produced them.
+
+This project is therefore best understood as an artifact shell rather than a software sample. Its significance is architectural. The repository folds into a legible binary-analysis object.
 
 ## Directory Layout
 
